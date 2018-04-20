@@ -2,11 +2,16 @@
 #include <Adafruit_Sensor.h>
 #include <Adafruit_ADXL345_U.h>
 #include <SFE_BMP180.h>
+#include <SPI.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+#define OLED_RESET 4
+
+Adafruit_SSD1306 display(OLED_RESET);
 
 /* Assign a unique ID to this sensor at the same time */
 Adafruit_ADXL345_Unified accel = Adafruit_ADXL345_Unified(12345);
 SFE_BMP180 pressure;
-
 double baseline; // baseline pressure
 void displaySensorDetails(void)
 {
@@ -110,11 +115,23 @@ void displayRange(void)
   Serial.println(" g");  
 }
 
-void setup(void) 
-{
-#ifndef ESP8266
-  while (!Serial); // for Leonardo/Micro/Zero
-#endif
+void setup(){
+    display.begin(SSD1306_SWITCHCAPVCC, 0x3C);  // initialize with the I2C addr 0x3D (for the 128x64)
+    display.clearDisplay();
+    display.setTextSize(2);
+    display.setTextColor(WHITE);
+    display.setCursor(10,0);
+    display.clearDisplay();
+    display.println("Horizon");
+    
+    display.display();
+
+    display.startscrollleft(0x00, 0x0F);
+    delay(4000);
+    display.stopscroll();
+    display.clearDisplay();
+
+
   Serial.begin(9600);
   Serial.println("Accelerometer Test"); Serial.println("");
   
@@ -168,6 +185,7 @@ void setup(void)
   Serial.println(" mb");  
   pinMode(4, OUTPUT);
   
+  
 }
 void eject()
 
@@ -175,6 +193,17 @@ void eject()
     digitalWrite(4, HIGH);
     delay(1000);
     digitalWrite(4, LOW);
+    display.clearDisplay();
+    display.setTextSize(3);
+  display.setTextColor(WHITE);
+  display.setCursor(0,0);
+  display.println("EJECT!!");
+  display.display();
+  delay(1000);
+  display.clearDisplay();
+  display.display();
+
+  
    }
 
 void loop(void) 
@@ -273,6 +302,5 @@ double getPressure()
   }
   else Serial.println("error starting temperature measurement\n");
 }
-
 
 
