@@ -5,15 +5,23 @@
 #include <SPI.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
+#include <Servo.h>
 #define OLED_RESET 4
+int lock=1;
+
+void displaySensorDetails();
+void displayDataRate();
+void displayRange();
+void DisplayLogo();
+void eject();
+double getPressure();
 
 Adafruit_SSD1306 display(OLED_RESET);
-
-/* Assign a unique ID to this sensor at the same time */
+Servo myservo;
 Adafruit_ADXL345_Unified accel = Adafruit_ADXL345_Unified(12345);
 SFE_BMP180 pressure;
-double baseline; // baseline pressure
-void displaySensorDetails(void)
+double baseline;
+void displaySensorDetails()
 {
   sensor_t sensor;
   accel.getSensor(&sensor);
@@ -29,7 +37,7 @@ void displaySensorDetails(void)
   delay(500);
 }
 
-void displayDataRate(void)
+void displayDataRate()
 {
   Serial.print  ("Data Rate:    "); 
   
@@ -90,7 +98,7 @@ void displayDataRate(void)
   Serial.println(" Hz");  
 }
 
-void displayRange(void)
+void displayRange()
 {
   Serial.print  ("Range:         +/- "); 
   
@@ -114,9 +122,8 @@ void displayRange(void)
   }  
   Serial.println(" g");  
 }
-
-void setup(){
-    display.begin(SSD1306_SWITCHCAPVCC, 0x3C);  // initialize with the I2C addr 0x3D (for the 128x64)
+void DisplayLogo()
+{ display.begin(SSD1306_SWITCHCAPVCC, 0x3C);  // initialize with the I2C addr 0x3D (for the 128x64)
     display.clearDisplay();
     display.setTextSize(2);
     display.setTextColor(WHITE);
@@ -130,169 +137,46 @@ void setup(){
     delay(4000);
     display.stopscroll();
     display.clearDisplay();
-
-
-  Serial.begin(9600);
-  Serial.println("Accelerometer Test"); Serial.println("");
-  
-  /* Initialise the sensor */
-  if(!accel.begin())
-  {
-    /* There was a problem detecting the ADXL345 ... check your connections */
-    Serial.println("Ooops, no ADXL345 detected ... Check your wiring!");
-    while(1);
   }
 
-  /* Set the range to whatever is appropriate for your project */
-  accel.setRange(ADXL345_RANGE_16_G);
-  // displaySetRange(ADXL345_RANGE_8_G);
-  // displaySetRange(ADXL345_RANGE_4_G);
-  // displaySetRange(ADXL345_RANGE_2_G);
-  
-  /* Display some basic information on this sensor */
-  displaySensorDetails();
-  
-  /* Display additional settings (outside the scope of sensor_t) */
-  displayDataRate();
-  displayRange();
-  Serial.println("");
-
-
-
-
-  Serial.begin(9600);
-  Serial.println("REBOOT");
-
-  // Initialize the sensor (it is important to get calibration values stored on the device).
-
-  if (pressure.begin())
-    Serial.println("BMP180 init success");
-  else
-  {
-    // Oops, something went wrong, this is usually a connection problem,
-    // see the comments at the top of this sketch for the proper connections.
-
-    Serial.println("BMP180 init fail (disconnected?)\n\n");
-    while(1); // Pause forever.
-  }
-
-  // Get the baseline pressure:
-  
-  baseline = getPressure();
-  
-  Serial.print("baseline pressure: ");
-  Serial.print(baseline);
-  Serial.println(" mb");  
-  pinMode(4, OUTPUT);
-  
-  
-}
 void eject()
+ {int pos=0;
+  myservo.attach(9);  // attaches the servo on pin 9 to the servo object
+  myservo.write(180);
+  delay(600);
+  myservo.write(2);
+  delay(600);
+  lock=0;
+ }
 
-   {pinMode(4, OUTPUT);
-    digitalWrite(4, HIGH);
-    delay(1000);
-    digitalWrite(4, LOW);
-    display.clearDisplay();
-    display.setTextSize(3);
+void oleddisplay(float X,float Y , float Z,float EH)
+{
+  display.setTextSize(1);
   display.setTextColor(WHITE);
   display.setCursor(0,0);
-  display.println("EJECT!!");
+  display.print("X= ");display.print(X);  display.print("|EH= ");display.println(EH);
+
+  display.print("Y= ");display.println(Y); // display.print("|AP= ");display.println(apogee);
+  display.print("Z= ");display.println(Z);
+
   display.display();
-  delay(1000);
-  display.clearDisplay();
-  display.display();
-
-  
-   }
-
-void loop(void) 
-{ double a,P;
-  
-  // Get a new pressure reading:
-
-  P = getPressure();
-
-  // Show the relative altitude difference between
-  // the new reading and the baseline reading:
-
-  a = pressure.altitude(P,baseline);
-
-  
-  /* Get a new sensor event */ 
-  sensors_event_t event; 
-  accel.getEvent(&event);
- 
-  /* Display the results (acceleration is measured in m/s^2) */
-  Serial.print("X: "); Serial.print(event.acceleration.x); Serial.print("  ");
-  Serial.print("Y: "); Serial.print(event.acceleration.y); Serial.print("  ");
-  Serial.print("Z: "); Serial.print(event.acceleration.z); Serial.print("  ");Serial.println("m/s^2 ");
-  if ( event.acceleration.x<-2|| event.acceleration.y > 9 || event.acceleration.y < -9 || event.acceleration.z > 9 || event.acceleration.z < -9 || a > 1)
-  eject();
-
-
-  
-  
-  Serial.print("relative altitude: ");
-  if (a >= 0.0) Serial.print(" "); // add a space for positive numbers
-  Serial.print(a,1);
-  Serial.print(" meters, ");
-  if (a >= 0.0) Serial.print(" "); // add a space for positive numbers
-  Serial.print(a*3.28084,0);
-  Serial.print(" feet ||  ");
-  
-}
-
-
-
+  lock=1;
+  }
 double getPressure()
 {
   char status;
   double T,P,p0,a;
-
-  // You must first get a temperature measurement to perform a pressure reading.
-  
-  // Start a temperature measurement:
-  // If request is successful, the number of ms to wait is returned.
-  // If request is unsuccessful, 0 is returned.
-
   status = pressure.startTemperature();
   if (status != 0)
-  {
-    // Wait for the measurement to complete:
-
-    delay(status);
-
-    // Retrieve the completed temperature measurement:
-    // Note that the measurement is stored in the variable T.
-    // Use '&T' to provide the address of T to the function.
-    // Function returns 1 if successful, 0 if failure.
-
+  { delay(status);
     status = pressure.getTemperature(T);
     if (status != 0)
-    {
-      // Start a pressure measurement:
-      // The parameter is the oversampling setting, from 0 to 3 (highest res, longest wait).
-      // If request is successful, the number of ms to wait is returned.
-      // If request is unsuccessful, 0 is returned.
-
-      status = pressure.startPressure(3);
+    { status = pressure.startPressure(3);
       if (status != 0)
-      {
-        // Wait for the measurement to complete:
-        delay(status);
-
-        // Retrieve the completed pressure measurement:
-        // Note that the measurement is stored in the variable P.
-        // Use '&P' to provide the address of P.
-        // Note also that the function requires the previous temperature measurement (T).
-        // (If temperature is stable, you can do one temperature measurement for a number of pressure measurements.)
-        // Function returns 1 if successful, 0 if failure.
-
+      { delay(status);
         status = pressure.getPressure(P,T);
         if (status != 0)
-        {
-          return(P);
+        {return(P);
         }
         else Serial.println("error retrieving pressure measurement\n");
       }
@@ -302,5 +186,80 @@ double getPressure()
   }
   else Serial.println("error starting temperature measurement\n");
 }
+
+void setup(){
+
+ display.clearDisplay();
+ display.display();
+
+  Serial.begin(9600);
+  Serial.println("Accelerometer Test"); Serial.println("");
+  if(!accel.begin())
+  {
+    Serial.println("Ooops, no ADXL345 detected ... Check your wiring!");
+    while(1);
+  }
+
+  DisplayLogo();
+  accel.setRange(ADXL345_RANGE_16_G);
+  displaySensorDetails();
+  displayDataRate();
+  displayRange();
+  Serial.println("");
+  Serial.begin(9600);
+  Serial.println("REBOOT");
+  if (pressure.begin())
+    Serial.println("BMP180 init success");
+  else
+  {
+    Serial.println("BMP180 init fail (disconnected?)\n\n");
+    while(1); // Pause forever.
+  }
+  baseline = getPressure();
+  
+  Serial.print("baseline pressure: ");
+  Serial.print(baseline);
+  Serial.println(" mb");  
+  pinMode(4, OUTPUT);
+  
+  
+}
+
+void loop() 
+{ double currheight,P;
+   
+  int maxheight=2;
+  float t_g=10;
+  
+  P = getPressure();
+  
+  currheight = pressure.altitude(P,baseline);
+  
+  double apogee= pressure.altitude(P,baseline);
+  sensors_event_t event; 
+  accel.getEvent(&event);
+  
+  Serial.print("X: "); Serial.print(event.acceleration.x); Serial.print("  ");
+  Serial.print("Y: "); Serial.print(event.acceleration.y); Serial.print("  ");
+  Serial.print("Z: "); Serial.print(event.acceleration.z); Serial.print("  ");Serial.println("m/s^2 ");
+  if ( event.acceleration.x<-10|| event.acceleration.y > t_g || event.acceleration.y < -t_g || event.acceleration.z > t_g || event.acceleration.z < -t_g || currheight > maxheight)
+     eject();
+  if (lock==0)
+   { oleddisplay(event.acceleration.x,event.acceleration.y,event.acceleration.z,currheight);}
+  Serial.print("relative altitude: ");
+  if (currheight >= 0.0) Serial.print(" ");
+  Serial.print(currheight);
+  Serial.print(" meters, ");
+  
+  if (currheight >= 0.0) Serial.print(" ");
+  Serial.print(currheight*3.28084);
+  Serial.print(" feet ||  ");
+  
+ 
+}
+
+
+
+
 
 
